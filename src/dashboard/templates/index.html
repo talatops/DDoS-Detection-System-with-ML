@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDoS Detection Dashboard</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }
+        .chart-container {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .alerts-container {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .alert-item {
+            padding: 10px;
+            border-left: 4px solid #e74c3c;
+            margin-bottom: 10px;
+            background-color: #f8f9fa;
+        }
+        .alert-item.benign {
+            border-left-color: #27ae60;
+        }
+        .blackhole-list {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .ip-item {
+            padding: 5px;
+            font-family: monospace;
+            color: #e74c3c;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.danger {
+            background-color: #e74c3c;
+        }
+        button.danger:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DDoS Detection System Dashboard</h1>
+            <p>Real-time monitoring and control</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="gpu-util">0%</div>
+                <div class="stat-label">GPU Utilization</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="throughput-pps">0</div>
+                <div class="stat-label">Throughput (pps)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="throughput-gbps">0</div>
+                <div class="stat-label">Throughput (Gbps)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="attacks-detected">0</div>
+                <div class="stat-label">Attacks Detected</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="blackhole-count">0</div>
+                <div class="stat-label">Blackholed IPs</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>GPU Utilization Over Time</h3>
+            <div id="gpu-chart" style="height: 300px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>Throughput Over Time</h3>
+            <div id="throughput-chart" style="height: 300px;"></div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>ML Model Training Results</h3>
+            <div id="training-metrics">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;">
+                    <div class="stat-card">
+                        <div class="stat-value" id="model-accuracy">-</div>
+                        <div class="stat-label">Model Accuracy</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="roc-auc">-</div>
+                        <div class="stat-label">ROC AUC</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="f1-score">-</div>
+                        <div class="stat-label">F1 Score</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="precision">-</div>
+                        <div class="stat-label">Precision</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <h4>ROC Curve</h4>
+                        <img id="roc-curve-img" src="/api/roc-curve" alt="ROC Curve" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div>
+                        <h4>Model Information</h4>
+                        <div id="model-info" style="font-size: 0.9em; line-height: 1.6;">
+                            <p><strong>Algorithm:</strong> <span id="model-algo">-</span></p>
+                            <p><strong>Features:</strong> <span id="model-features">-</span></p>
+                            <p><strong>Training Samples:</strong> <span id="train-samples">-</span></p>
+                            <p><strong>Test Samples:</strong> <span id="test-samples">-</span></p>
+                        </div>
+                        <button onclick="loadTrainingReport()" style="margin-top: 10px;">View Full Report</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="alerts-container">
+                <h3>Recent Alerts</h3>
+                <div id="alerts-list"></div>
+            </div>
+            
+            <div class="blackhole-list">
+                <h3>Blackhole List</h3>
+                <button onclick="toggleRTBH()">Toggle RTBH</button>
+                <button class="danger" onclick="clearBlackhole()">Clear All</button>
+                <div id="blackhole-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
+

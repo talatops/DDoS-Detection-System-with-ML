@@ -1,0 +1,40 @@
+{
+  "features": [
+    "total_packets",
+    "total_bytes",
+    "unique_src_ips",
+    "unique_dst_ips",
+    "unique_src_ports",
+    "unique_dst_ports",
+    "flow_count",
+    "avg_packet_size",
+    "src_ip_entropy",
+    "dst_ip_entropy",
+    "src_port_entropy",
+    "dst_port_entropy",
+    "packet_size_entropy",
+    "protocol_entropy",
+    "top10_src_ip_fraction",
+    "top10_dst_ip_fraction"
+  ],
+  "description": "Features extracted from network traffic windows for DDoS detection",
+  "feature_types": {
+    "total_packets": "count",
+    "total_bytes": "count",
+    "unique_src_ips": "count",
+    "unique_dst_ips": "count",
+    "unique_src_ports": "count",
+    "unique_dst_ports": "count",
+    "flow_count": "count",
+    "avg_packet_size": "continuous",
+    "src_ip_entropy": "continuous",
+    "dst_ip_entropy": "continuous",
+    "src_port_entropy": "continuous",
+    "dst_port_entropy": "continuous",
+    "packet_size_entropy": "continuous",
+    "protocol_entropy": "continuous",
+    "top10_src_ip_fraction": "continuous",
+    "top10_dst_ip_fraction": "continuous"
+  }
+}
+

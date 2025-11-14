@@ -1,0 +1,56 @@
+# IDE and Editor files
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+cmake-build-*/
+
+# Data and datasets (large files, not pushed)
+data/
+
+# Trained models (large files, not pushed)
+models/
+
+# Results and plots (generated files, not pushed)
+results/
+
+# Logs (generated files, not pushed)
+logs/
+
+# Reports (generated files, not pushed)
+reports/
+
+# Report directory (if exists)
+report/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+.pytest_cache/
+.coverage
+.coverage.*
+.coverage.*.*
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Note: All .md documentation files are tracked (removed from gitignore)
