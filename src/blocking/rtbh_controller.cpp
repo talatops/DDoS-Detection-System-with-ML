@@ -103,7 +103,6 @@ bool RTBHController::loadFromFile() {
     
     // Simple JSON parsing (for production, use a proper JSON library)
     std::string line;
-    bool in_array = false;
     
     while (std::getline(file, line)) {
         // Look for IP addresses in quotes

@@ -25,12 +25,21 @@ struct WindowStats {
     uint32_t unique_src_ips;
     uint32_t unique_dst_ips;
     uint32_t flow_count;
+    uint32_t tcp_packets;
+    uint32_t udp_packets;
+    uint32_t syn_packets;
+    uint32_t fin_packets;
+    uint32_t rst_packets;
+    uint32_t ack_packets;
     
     // Flow tracking (5-tuple)
     std::unordered_map<uint64_t, uint32_t> flow_counts;  // flow_hash -> count
     
-    WindowStats() : total_packets(0), total_bytes(0), 
-                    unique_src_ips(0), unique_dst_ips(0), flow_count(0) {}
+    WindowStats() : total_packets(0), total_bytes(0),
+                    unique_src_ips(0), unique_dst_ips(0), flow_count(0),
+                    tcp_packets(0), udp_packets(0),
+                    syn_packets(0), fin_packets(0),
+                    rst_packets(0), ack_packets(0) {}
     
     void reset() {
         src_ip_counts.clear();
@@ -45,6 +54,12 @@ struct WindowStats {
         unique_src_ips = 0;
         unique_dst_ips = 0;
         flow_count = 0;
+        tcp_packets = 0;
+        udp_packets = 0;
+        syn_packets = 0;
+        fin_packets = 0;
+        rst_packets = 0;
+        ack_packets = 0;
     }
 };
 

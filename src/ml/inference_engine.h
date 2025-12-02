@@ -13,8 +13,10 @@ public:
     MLInferenceEngine();
     ~MLInferenceEngine();
     
-    // Load Random Forest model from joblib file
-    bool loadModel(const std::string& model_path);
+    // Load model from joblib file with optional preprocessor/import hints
+    bool loadModel(const std::string& model_path,
+                   const std::string& preprocessor_path = "",
+                   const std::vector<std::string>& module_imports = {});
     
     // Predict single sample (returns probability of attack class)
     double predict(const std::vector<double>& features);
@@ -28,6 +30,7 @@ public:
 private:
     bool model_loaded_;
     std::string model_path_;
+    std::string preprocessor_path_;
     PyObject* model_;  // Python model object (RandomForestClassifier)
     PyObject* preprocessor_;  // Python preprocessor object (optional)
     

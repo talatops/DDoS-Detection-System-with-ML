@@ -16,11 +16,17 @@ public:
     
     // Log alert
     void logAlert(uint64_t timestamp_ms, uint64_t window_start_ms,
-                 uint32_t src_ip, double score, const std::string& detector);
+                 uint64_t window_index, uint32_t top_src_ip,
+                 double entropy_score, double ml_score,
+                 double cusum_score, double pca_score,
+                 double combined_score, const std::string& detector,
+                 const std::string& model_name);
     
     // Log metrics
     void logMetrics(uint64_t timestamp_ms, double cpu_percent, double gpu_percent,
-                   double memory_mb, double pps_in, double pps_processed);
+                   double memory_mb, double pps_in, double pps_processed,
+                   uint64_t windows_processed = 0,
+                   const std::string& model_name = "");
     
     // Log blocking action
     void logBlocking(uint64_t timestamp_ms, uint32_t ip, uint64_t impacted_packets,

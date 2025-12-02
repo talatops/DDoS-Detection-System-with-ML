@@ -23,14 +23,28 @@ public:
     // Write buffer (async)
     bool writeBuffer(cl_mem buffer, size_t size, void* data, bool blocking = false);
     
+    // Write buffer async with event
+    bool writeBufferAsync(cl_mem buffer, size_t size, void* data, cl_event* event);
+    
     // Read buffer (async)
     bool readBuffer(cl_mem buffer, size_t size, void* data, bool blocking = false);
+    
+    // Release buffer
+    void releaseBuffer(cl_mem buffer);
+    
+    // Get kernel object (for manual argument setting)
+    cl_kernel getKernel(const std::string& kernel_name);
     
     // Execute kernel
     bool executeKernel(const std::string& kernel_name,
                       size_t global_work_size,
                       size_t local_work_size = 0,
                       const std::vector<cl_mem>& args = {});
+    
+    // Execute kernel with arguments already set (for custom argument setting)
+    bool executeKernelPrepared(const std::string& kernel_name,
+                               size_t global_work_size,
+                               size_t local_work_size = 0);
     
     // Wait for completion
     void finish();
@@ -69,7 +83,6 @@ private:
     bool findDevice(const std::string& device_name);
     bool createContext();
     bool createCommandQueue();
-    cl_kernel getKernel(const std::string& kernel_name);
     std::string readKernelSource(const std::string& filename);
     void checkError(cl_int err, const std::string& operation);
 };

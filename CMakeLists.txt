@@ -55,10 +55,13 @@ set(UTILS_SOURCES
     src/utils/metrics_collector.cpp
     src/utils/resource_monitor.cpp
     src/utils/logger.cpp
+    src/utils/simple_json.cpp
+    src/utils/config_loader.cpp
 )
 
 set(ML_SOURCES
     src/ml/inference_engine.cpp
+    src/ml/feature_builder.cpp
 )
 
 set(ALL_SOURCES

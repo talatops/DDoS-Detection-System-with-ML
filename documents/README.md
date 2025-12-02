@@ -154,6 +154,9 @@ sudo apt-get install -y build-essential cmake libpcap-dev \
     python3-scipy python3-setuptools
 
 pip3 install --user scikit-learn flask flask-socketio psutil joblib scapy pybind11
+
+# Optional: Install PyTorch for DNN training (CPU version)
+pip3 install --user torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
 
 ### 2. Verify GPU Setup
@@ -164,6 +167,11 @@ nvidia-smi
 
 # Verify OpenCL platforms
 clinfo | grep "Platform Name"
+
+# If OpenCL is not detected:
+# - Install OpenCL drivers: sudo apt-get install ocl-icd-opencl-dev nvidia-opencl-icd
+# - Verify with: clinfo -l
+# - Check udev rules if permission errors occur
 ```
 
 ### 3. Build the Project
@@ -177,13 +185,25 @@ make
 ### 4. Train ML Model
 
 ```bash
-# Train Random Forest model
-python3 src/ml/train_ml.py
+# Train all models (RF, GBDT, DNN)
+python3 src/ml/train_models.py --models rf gbdt dnn
 
-# Model will be saved to models/rf_model.joblib
+# Train with data balancing (reduces class imbalance warnings)
+python3 src/ml/train_models.py --balance-data --max-ratio 5.0
+
+# Train specific models only
+python3 src/ml/train_models.py --models rf gbdt  # Skip DNN if PyTorch not installed
+
+# Models will be saved to models/
+# Model manifest: models/model_manifest.json
 # Training report: reports/training_report.txt
-# ROC curve: results/ml_roc_curve.png
+# ROC curves: results/ml_roc_curve_*.png
 ```
+
+**Note on Data Balancing:**
+- Use `--balance-data` to downsample majority class and reduce class imbalance
+- `--max-ratio` controls the maximum ratio of majority to minority class (default: 5.0)
+- Class distribution is logged in `reports/training_metrics.json`
 
 ---
 
@@ -605,13 +625,18 @@ See `PHASE2_TESTING.md` for detailed testing guide.
 ### ML Model Evaluation
 
 ```bash
-# View training report
+# Audit datasets
+python3 tools/data_audit.py --datasets data/caida-ddos2019 data/caida-ddos2007
+
+# Train baseline + candidate models
+python3 src/ml/train_models.py --datasets data/caida-ddos2007 --models rf gbdt dnn
+
+# Validate manifest + smoke test inference
+python3 tools/validate_ml_models.py --manifest models/model_manifest.json
+
+# Inspect reports
 cat reports/training_report.txt
-
-# View training metrics
 cat reports/training_metrics.json
-
-# View ROC curve
 xdg-open results/ml_roc_curve.png
 ```
 
@@ -619,25 +644,30 @@ xdg-open results/ml_roc_curve.png
 
 ## Configuration
 
-Edit `config/detection_config.json` to adjust:
-- Detection thresholds
-- Ensemble weights
-- Window sizes
-- Batch sizes
+- `config/detection_config.json` — detector thresholds & ensemble weights (hot reload).
+- `models/model_manifest.json` — list of trained models and the currently selected one.
 
-Example configuration:
+Example detection settings:
 ```json
 {
-  "entropy_threshold": 0.7,
-  "ml_threshold": 0.5,
-  "cusum_threshold": 5.0,
-  "pca_threshold": 0.1,
-  "ensemble_weights": {
-    "entropy": 0.4,
-    "ml": 0.4,
-    "statistical": 0.2
+  "entropy_threshold": 0.55,
+  "ml_threshold": 0.45,
+  "cusum_threshold": 2.5,
+  "pca_threshold": 1.25,
+  "use_weighted": true,
+  "weights": {
+    "entropy": 0.35,
+    "ml": 0.45,
+    "cusum": 0.1,
+    "pca": 0.1
   }
 }
+```
+
+To change the inference model at runtime:
+
+```bash
+./build/detector --ml-model gbdt ...
 ```
 
 ---
@@ -668,9 +698,9 @@ Example configuration:
    mkdir -p build && cd build && cmake .. && make
    ```
 
-3. **Train ML model**:
+3. **Train ML models**:
    ```bash
-   python3 src/ml/train_ml.py
+   python3 src/ml/train_models.py --datasets data/caida-ddos2007 --models rf gbdt
    ```
 
 4. **Run validation**:
@@ -728,34 +758,120 @@ Example configuration:
 
 ## Troubleshooting
 
-### GPU Not Detected
+### GPU Not Detected / OpenCL Context Creation Failed
+
+**Symptoms**: `Failed to create context` error when running with `--use-gpu`
+
+**Solutions**:
 ```bash
-# Check NVIDIA driver
+# 1. Check NVIDIA driver
 nvidia-smi
 
-# Install OpenCL ICD
-sudo apt-get install nvidia-opencl-icd
+# 2. Install OpenCL drivers
+sudo apt-get install ocl-icd-opencl-dev nvidia-opencl-icd
 
-# Verify OpenCL
-clinfo | grep "Platform Name"
+# 3. Verify OpenCL platforms and devices
+clinfo -l
+
+# 4. Check for permission issues
+# If you see permission errors, check udev rules or run with sudo (not recommended for production)
+
+# 5. The detector will automatically fall back to CPU if GPU initialization fails
+# Check logs for detailed error messages about platform/device detection
 ```
 
-### Build Errors
+**Diagnostics**: The OpenCL host now provides detailed error messages:
+- Lists all available platforms and devices
+- Shows which platform/device was selected
+- Provides troubleshooting hints for common issues
+
+### PyTorch Not Available for DNN Training
+
+**Symptoms**: `AttributeError: 'NoneType' object has no attribute 'Module'` or DNN training skipped
+
+**Solutions**:
 ```bash
-# Install dependencies
-sudo apt-get install libpcap-dev build-essential cmake
+# Install PyTorch (CPU version - sufficient for training)
+pip3 install --user torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Verify installation
+python3 -c "import torch; print(f'PyTorch {torch.__version__} available')"
+
+# Train without DNN if PyTorch is not needed
+python3 src/ml/train_models.py --models rf gbdt  # Skip DNN
+```
+
+**Note**: DNN training is optional. RF and GBDT models work without PyTorch.
+
+### Class Imbalance Warnings During Training
+
+**Symptoms**: `UndefinedMetricWarning: Precision is ill-defined` or highly imbalanced class distribution
+
+**Solutions**:
+```bash
+# Use data balancing to reduce class imbalance
+python3 src/ml/train_models.py --balance-data --max-ratio 5.0
+
+# Adjust max-ratio to control balance (lower = more balanced)
+python3 src/ml/train_models.py --balance-data --max-ratio 2.0  # More aggressive balancing
+
+# Check class distribution in training report
+cat reports/training_metrics.json | grep -A 10 "class_distribution"
+```
+
+**Note**: Balancing reduces dataset size but improves training stability and reduces warnings.
+
+### Build Errors
+
+**Symptoms**: Compilation failures, missing headers, linker errors
+
+**Solutions**:
+```bash
+# Install all dependencies
+sudo apt-get install libpcap-dev build-essential cmake \
+    ocl-icd-opencl-dev nvidia-opencl-icd
 
 # Clean and rebuild
 rm -rf build && mkdir build && cd build && cmake .. && make
+
+# If permission errors occur (build directory owned by root)
+sudo chown -R $USER:$USER build/
+```
+
+### GPU Benchmark Build Failures
+
+**Symptoms**: `tools/benchmark_gpu_performance.cpp` or `tools/test_gpu_entropy.cpp` fails to build
+
+**Solutions**:
+```bash
+# The run_gpu_tests.sh script should build these automatically
+./tools/run_gpu_tests.sh
+
+# Or build manually
+cd build
+g++ -std=c++17 -O3 -Isrc -I../src -I/usr/include \
+    ../tools/test_gpu_entropy.cpp \
+    src/opencl/gpu_detector.cpp src/opencl/host.cpp \
+    src/detectors/entropy_cpu.cpp \
+    src/ingest/window_manager.cpp src/ingest/pcap_reader.cpp \
+    -lOpenCL -lpcap -lpthread -o test_gpu_entropy
 ```
 
 ### Python Import Errors
+
+**Symptoms**: `ModuleNotFoundError` or import failures
+
+**Solutions**:
 ```bash
 # Install Python packages
-pip3 install --user scikit-learn flask flask-socketio psutil joblib
+pip3 install --user scikit-learn flask flask-socketio psutil joblib \
+    numpy pandas matplotlib scipy
 
 # Check Python path
 python3 -c "import sys; print(sys.path)"
+
+# Verify installation
+python3 -c "import sklearn; import flask; print('OK')"
 ```
 
 ---
@@ -801,5 +917,5 @@ For questions or issues:
 
 ---
 
-**Last Updated**: November 2024
+**Last Updated**: November 2025
 **Current Version**: Phases 1-3 Complete (with real entropy), Phase 7 Complete

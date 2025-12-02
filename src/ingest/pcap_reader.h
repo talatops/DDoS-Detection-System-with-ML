@@ -43,6 +43,7 @@ public:
 private:
     void* handle_;  // pcap_t* handle
     uint64_t packet_count_;
+    int link_type_;  // PCAP link type (DLT_RAW, DLT_EN10MB, etc.)
     
     // Parse Ethernet/IP/TCP/UDP headers
     bool parsePacket(const uint8_t* data, uint32_t len, PacketInfo& packet);

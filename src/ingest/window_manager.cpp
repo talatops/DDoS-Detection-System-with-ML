@@ -1,5 +1,7 @@
 #include "window_manager.h"
 #include <algorithm>
+#include <netinet/tcp.h>
+#include <netinet/in.h>
 
 WindowManager::WindowManager(uint32_t window_size_sec) 
     : window_size_us_(window_size_sec * 1000000ULL),
@@ -47,6 +49,17 @@ void WindowManager::addPacket(const PacketInfo& packet) {
     current_window_.total_packets++;
     current_window_.total_bytes += packet.packet_size;
     
+    if (packet.protocol == IPPROTO_TCP) {
+        current_window_.tcp_packets++;
+        uint8_t flags = packet.tcp_flags;
+        if (flags & TH_SYN) current_window_.syn_packets++;
+        if (flags & TH_FIN) current_window_.fin_packets++;
+        if (flags & TH_RST) current_window_.rst_packets++;
+        if (flags & TH_ACK) current_window_.ack_packets++;
+    } else if (packet.protocol == IPPROTO_UDP) {
+        current_window_.udp_packets++;
+    }
+
     // Update unique IP counts
     current_window_.unique_src_ips = current_window_.src_ip_counts.size();
     current_window_.unique_dst_ips = current_window_.dst_ip_counts.size();

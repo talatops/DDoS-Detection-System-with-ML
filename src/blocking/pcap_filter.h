@@ -11,7 +11,7 @@ public:
     ~PcapFilter();
     
     // Check if packet should be dropped
-    bool shouldDrop(uint32_t src_ip, uint32_t dst_ip) const;
+    bool shouldDrop(uint32_t src_ip, uint32_t dst_ip);
     
     // Get statistics
     uint64_t getPacketsDropped() const { return packets_dropped_; }

@@ -5,14 +5,18 @@
 DecisionEngine::DecisionEngine(double entropy_threshold, double ml_threshold,
                                double cusum_threshold, double pca_threshold,
                                bool use_weighted)
-    : entropy_threshold_(entropy_threshold),
+    : entropy_detector_(),
+      cusum_detector_(cusum_threshold),
+      pca_detector_(3, 1000, pca_threshold),
+      entropy_threshold_(entropy_threshold),
       ml_threshold_(ml_threshold),
       cusum_threshold_(cusum_threshold),
       pca_threshold_(pca_threshold),
       use_weighted_(use_weighted),
-      w_entropy_(0.4), w_ml_(0.4), w_cusum_(0.1), w_pca_(0.1),
-      cusum_detector_(cusum_threshold),
-      pca_detector_(3, 1000, pca_threshold) {
+      w_entropy_(0.4),
+      w_ml_(0.4),
+      w_cusum_(0.1),
+      w_pca_(0.1) {
 }
 
 DecisionEngine::~DecisionEngine() {
@@ -37,6 +41,8 @@ void DecisionEngine::setWeights(double w_entropy, double w_ml, double w_cusum, d
 void DecisionEngine::update(const EntropyDetector::EntropyFeatures& entropy_features,
                            double ml_probability,
                            const EntropyDetector::EntropyFeatures& current_features) {
+    (void)ml_probability;  // May be used in future weighted detection
+    (void)current_features;  // May be used for PCA updates
     // Update CUSUM with average entropy
     double avg_entropy = (entropy_features.src_ip_entropy + entropy_features.dst_ip_entropy +
                          entropy_features.src_port_entropy + entropy_features.dst_port_entropy +

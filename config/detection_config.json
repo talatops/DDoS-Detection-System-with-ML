@@ -1,0 +1,23 @@
+{
+  "entropy_threshold": 0.55,
+  "ml_threshold": 0.45,
+  "cusum_threshold": 2.5,
+  "pca_threshold": 1.25,
+  "use_weighted": true,
+  "weights": {
+    "entropy": 0.35,
+    "ml": 0.45,
+    "cusum": 0.1,
+    "pca": 0.1
+  },
+  "description": "Detection thresholds and weights for ensemble DDoS detection",
+  "notes": {
+    "entropy_threshold": "Threshold for entropy-based detection (0.0-1.0, higher = more sensitive)",
+    "ml_threshold": "Threshold for ML probability (0.0-1.0, typically 0.5)",
+    "cusum_threshold": "Threshold for CUSUM change detection (statistical threshold)",
+    "pca_threshold": "Threshold for PCA anomaly detection (reconstruction error)",
+    "use_weighted": "If true, use weighted combination instead of ensemble (OR logic)",
+    "weights": "Weights for weighted combination (must sum to 1.0)"
+  }
+}
+

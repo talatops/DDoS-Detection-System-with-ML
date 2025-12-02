@@ -144,7 +144,13 @@ class FeaturePreprocessor:
         return X_clipped
     
     def save(self, filepath):
-        """Save preprocessor to file."""
+        """Save preprocessor to file using joblib."""
+        import joblib
+        # Save the entire object, not just a dictionary
+        joblib.dump(self, filepath)
+    
+    def _save_dict(self, filepath):
+        """Save preprocessor as dictionary (legacy method, not recommended)."""
         preprocessor_data = {
             'use_scaling': self.use_scaling,
             'use_outlier_removal': self.use_outlier_removal,

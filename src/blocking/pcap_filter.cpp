@@ -8,7 +8,7 @@ PcapFilter::PcapFilter(RTBHController* rtbh_controller)
 PcapFilter::~PcapFilter() {
 }
 
-bool PcapFilter::shouldDrop(uint32_t src_ip, uint32_t dst_ip) const {
+bool PcapFilter::shouldDrop(uint32_t src_ip, uint32_t dst_ip) {
     packets_processed_++;
     
     // Drop if source or destination IP is blackholed

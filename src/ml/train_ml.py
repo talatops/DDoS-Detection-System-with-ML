@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 from src.ml.feature_extractor import FeatureExtractor
 from src.ml.preprocessor import FeaturePreprocessor
 
-def load_training_data(csv_dir="data/caida-ddos2007"):
+def load_training_data(csv_dir="data/caida-ddos2007", max_rows=None):
     """Load training data from CSV files."""
     print("Loading training data...")
     
@@ -40,7 +40,10 @@ def load_training_data(csv_dir="data/caida-ddos2007"):
     for csv_file in csv_files:
         try:
             print(f"Loading {csv_file.name}...")
-            df = pd.read_csv(csv_file, nrows=50000, low_memory=False)  # Limit rows for faster processing
+            nrows = max_rows if max_rows and max_rows > 0 else None
+            if nrows:
+                print(f"  (limiting to first {nrows} rows)")
+            df = pd.read_csv(csv_file, nrows=nrows, low_memory=False)
             
             # Check if Label column exists (case-insensitive, handle spaces)
             label_col = None

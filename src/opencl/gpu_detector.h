@@ -35,6 +35,9 @@ private:
     cl_mem counts_buffer_;
     cl_mem totals_buffer_;
     cl_mem entropy_buffer_;
+    size_t counts_buffer_size_;
+    size_t totals_buffer_size_;
+    size_t entropy_buffer_size_;
     
     // Prepare data for GPU
     bool prepareBatchData(const std::vector<WindowStats>& windows,

@@ -1,5 +1,6 @@
 #include "pcap_reader.h"
 #include <pcap/pcap.h>
+#include <pcap/bpf.h>  // For DLT_ constants
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
@@ -8,7 +9,7 @@
 #include <cstring>
 #include <iostream>
 
-PcapReader::PcapReader() : handle_(nullptr), packet_count_(0) {
+PcapReader::PcapReader() : handle_(nullptr), packet_count_(0), link_type_(-1) {
 }
 
 PcapReader::~PcapReader() {
@@ -25,6 +26,9 @@ bool PcapReader::open(const std::string& filename) {
     }
     
     packet_count_ = 0;
+    
+    // Get link type (DLT_RAW for Raw IP, DLT_EN10MB for Ethernet, etc.)
+    link_type_ = pcap_datalink(static_cast<pcap_t*>(handle_));
     
     // Set filter to only IP traffic
     setFilter("ip");
@@ -61,16 +65,43 @@ bool PcapReader::setFilter(const std::string& filter) {
 bool PcapReader::parsePacket(const uint8_t* data, uint32_t len, PacketInfo& packet) {
     packet.is_valid = false;
     
-    // Minimum Ethernet header size
-    if (len < 14) return false;
+    const uint8_t* ip_data = data;
+    uint32_t ip_len = len;
     
-    // Check Ethernet type (0x0800 for IPv4)
-    uint16_t eth_type = (data[12] << 8) | data[13];
-    if (eth_type != 0x0800) return false;  // Not IPv4
-    
-    // Skip Ethernet header (14 bytes)
-    const uint8_t* ip_data = data + 14;
-    uint32_t ip_len = len - 14;
+    // Handle different link types
+    if (link_type_ == DLT_RAW || link_type_ == DLT_IPV4) {
+        // Raw IP - no Ethernet header, starts directly with IP
+        // No adjustment needed
+    } else if (link_type_ == DLT_EN10MB) {
+        // Ethernet - check for minimum size and Ethernet type
+        if (len < 14) return false;
+        
+        // Check Ethernet type (0x0800 for IPv4)
+        uint16_t eth_type = (data[12] << 8) | data[13];
+        if (eth_type != 0x0800) return false;  // Not IPv4
+        
+        // Skip Ethernet header (14 bytes)
+        ip_data = data + 14;
+        ip_len = len - 14;
+    } else {
+        // Unknown link type - try to detect
+        // If first byte looks like IP version (4 or 6), assume Raw IP
+        if (len >= 1 && (data[0] & 0xF0) == 0x40) {
+            // Looks like IPv4 (version 4 = 0x40)
+            // Treat as Raw IP
+        } else if (len >= 14) {
+            // Try Ethernet format
+            uint16_t eth_type = (data[12] << 8) | data[13];
+            if (eth_type == 0x0800) {
+                ip_data = data + 14;
+                ip_len = len - 14;
+            } else {
+                return false;  // Unknown format
+            }
+        } else {
+            return false;  // Too short
+        }
+    }
     
     if (ip_len < sizeof(struct ip)) return false;
     

@@ -1,222 +1,161 @@
-// Dashboard JavaScript for real-time updates
+const gpuChart = document.getElementById('gpu-chart');
+const ppsChart = document.getElementById('pps-chart');
 
-const socket = io();
-
-// Chart data
-let gpuData = {
-    x: [],
-    y: [],
-    type: 'scatter',
-    mode: 'lines',
-    name: 'GPU Utilization (%)'
+const chartLayout = {
+    margin: { t: 10, r: 20, l: 40, b: 30 },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#e2e8f0' },
+    xaxis: { type: 'date', tickformat: '%H:%M:%S' }
 };
 
-let throughputData = {
-    x: [],
-    y: [],
-    type: 'scatter',
-    mode: 'lines',
+Plotly.newPlot(gpuChart, [{
+    x: [], y: [], mode: 'lines', line: { color: '#38bdf8' },
+    name: 'GPU %'
+}], { ...chartLayout, yaxis: { title: 'GPU %', range: [0, 100] } }, { responsive: true });
+
+Plotly.newPlot(ppsChart, [{
+    x: [], y: [], mode: 'lines', line: { color: '#a78bfa' },
     name: 'Throughput (pps)'
-};
+}], { ...chartLayout, yaxis: { title: 'Packets/sec' } }, { responsive: true });
 
-// Initialize charts
-Plotly.newPlot('gpu-chart', [gpuData], {
-    title: 'GPU Utilization',
-    xaxis: { title: 'Time' },
-    yaxis: { title: 'Utilization (%)', range: [0, 100] }
-});
-
-Plotly.newPlot('throughput-chart', [throughputData], {
-    title: 'Throughput',
-    xaxis: { title: 'Time' },
-    yaxis: { title: 'Packets per Second' }
-});
-
-// WebSocket event handlers
-socket.on('connect', function() {
-    console.log('Connected to server');
-});
-
-socket.on('metrics_update', function(data) {
-    updateMetrics(data);
-    updateCharts(data);
-});
-
-socket.on('alerts_update', function(data) {
-    updateAlerts(data.alerts);
-});
-
-socket.on('blackhole_update', function(data) {
-    updateBlackholeList(data.blackhole_ips);
-});
-
-// Update metrics display
-function updateMetrics(data) {
-    if (data.gpu_percent !== undefined) {
-        document.getElementById('gpu-util').textContent = data.gpu_percent.toFixed(1) + '%';
-    }
-    if (data.pps_in !== undefined) {
-        document.getElementById('throughput-pps').textContent = Math.round(data.pps_in).toLocaleString();
-    }
-    if (data.pps_in !== undefined) {
-        const gbps = (data.pps_in * 1500 * 8) / 1e9; // Approximate
-        document.getElementById('throughput-gbps').textContent = gbps.toFixed(2);
-    }
+function renderSummary(summary) {
+    const cards = [
+        { label: 'GPU Utilization', value: `${summary.gpu_percent.toFixed(1)}%` },
+        { label: 'CPU Utilization', value: `${summary.cpu_percent.toFixed(1)}%` },
+        { label: 'Packets / sec', value: summary.pps_in.toLocaleString() },
+        { label: 'Windows Processed', value: summary.windows_processed.toLocaleString() },
+        { label: 'Active Model', value: summary.model || 'N/A' },
+        { label: 'Memory (MB)', value: summary.memory_mb.toFixed(0) },
+    ];
+    document.getElementById('summary-cards').innerHTML = cards.map(card => `
+        <div class="summary-card">
+            <div class="summary-label">${card.label}</div>
+            <div class="summary-value">${card.value}</div>
+        </div>
+    `).join('');
 }
 
-// Update charts
-function updateCharts(data) {
-    const now = new Date().toISOString();
-    
-    // GPU chart
-    gpuData.x.push(now);
-    gpuData.y.push(data.gpu_percent || 0);
-    if (gpuData.x.length > 100) {
-        gpuData.x.shift();
-        gpuData.y.shift();
-    }
-    Plotly.redraw('gpu-chart');
-    
-    // Throughput chart
-    throughputData.x.push(now);
-    throughputData.y.push(data.pps_in || 0);
-    if (throughputData.x.length > 100) {
-        throughputData.x.shift();
-        throughputData.y.shift();
-    }
-    Plotly.redraw('throughput-chart');
-}
-
-// Update alerts list
-function updateAlerts(alerts) {
-    const alertsList = document.getElementById('alerts-list');
-    alertsList.innerHTML = '';
-    
-    if (alerts.length === 0) {
-        alertsList.innerHTML = '<p>No alerts</p>';
+function renderAlerts(alerts) {
+    const table = document.getElementById('alerts-table');
+    if (!alerts.length) {
+        table.innerHTML = '<tr><td>No alerts yet</td></tr>';
         return;
     }
-    
-    alerts.forEach(alert => {
-        const div = document.createElement('div');
-        div.className = 'alert-item';
-        div.innerHTML = `
-            <strong>${alert.detector}</strong> - ${alert.src_ip}<br>
-            Score: ${alert.score.toFixed(3)} | Time: ${alert.timestamp}
-        `;
-        alertsList.appendChild(div);
-    });
-    
-    document.getElementById('attacks-detected').textContent = alerts.length;
+    table.innerHTML = `
+        <tr><th>Time</th><th>Window</th><th>Source IP</th><th>Detector</th><th>Entropy</th><th>ML</th></tr>
+        ${alerts.map(alert => `
+            <tr>
+                <td>${alert.timestamp}</td>
+                <td>${alert.window_index}</td>
+                <td>${alert.src_ip}</td>
+                <td><span class="badge">${alert.detector}</span></td>
+                <td>${alert.entropy_score.toFixed(3)}</td>
+                <td>${alert.ml_score.toFixed(3)}</td>
+            </tr>
+        `).join('')}
+    `;
 }
 
-// Update blackhole list
-function updateBlackholeList(ips) {
-    const blackholeList = document.getElementById('blackhole-list');
-    blackholeList.innerHTML = '';
-    
-    if (ips.length === 0) {
-        blackholeList.innerHTML = '<p>No blackholed IPs</p>';
+function renderKernelTimes(kernelTimes) {
+    const table = document.getElementById('kernel-table');
+    if (!kernelTimes.length) {
+        table.innerHTML = '<tr><td>No GPU kernel runs logged</td></tr>';
         return;
     }
-    
-    ips.forEach(ip => {
-        const div = document.createElement('div');
-        div.className = 'ip-item';
-        div.textContent = ip;
-        blackholeList.appendChild(div);
-    });
-    
-    document.getElementById('blackhole-count').textContent = ips.length;
+    table.innerHTML = `
+        <tr><th>Time</th><th>Kernel</th><th>Duration (ms)</th></tr>
+        ${kernelTimes.map(entry => `
+            <tr>
+                <td>${entry.timestamp}</td>
+                <td>${entry.kernel}</td>
+                <td>${entry.duration_ms.toFixed(3)}</td>
+            </tr>
+        `).join('')}
+    `;
 }
 
-// Toggle RTBH
-function toggleRTBH() {
-    fetch('/api/toggle-rtbh', { method: 'POST' })
-        .then(response => response.json())
-        .then(data => {
-            alert('RTBH toggled: ' + (data.enabled ? 'ON' : 'OFF'));
-        })
-        .catch(error => {
-            console.error('Error toggling RTBH:', error);
-        });
-}
-
-// Clear blackhole list
-function clearBlackhole() {
-    if (confirm('Clear all blackholed IPs?')) {
-        fetch('/api/clear-blackhole', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                updateBlackholeList([]);
-            })
-            .catch(error => {
-                console.error('Error clearing blackhole:', error);
-            });
+function renderBlocking(blockingRows) {
+    const table = document.getElementById('blocking-table');
+    if (!blockingRows.length) {
+        table.innerHTML = '<tr><td>No blocking events</td></tr>';
+        return;
     }
+    table.innerHTML = `
+        <tr><th>Time</th><th>IP</th><th>Impacted Packets</th><th>Dropped Packets</th></tr>
+        ${blockingRows.map(row => `
+            <tr>
+                <td>${row.timestamp}</td>
+                <td>${row.ip}</td>
+                <td>${row.impacted_packets.toLocaleString()}</td>
+                <td>${row.dropped_packets.toLocaleString()}</td>
+            </tr>
+        `).join('')}
+    `;
 }
 
-// Load training metrics
-function loadTrainingMetrics() {
-    fetch('/api/training-metrics')
-        .then(response => {
-            if (response.ok) {
-                return response.json();
-            }
-            throw new Error('Training metrics not available');
-        })
-        .then(data => {
-            // Update metrics display
-            if (data.metrics) {
-                document.getElementById('model-accuracy').textContent = 
-                    (data.metrics.test_accuracy * 100).toFixed(1) + '%';
-                document.getElementById('roc-auc').textContent = 
-                    data.metrics.roc_auc.toFixed(3);
-                document.getElementById('f1-score').textContent = 
-                    data.metrics.f1_score.toFixed(3);
-                document.getElementById('precision').textContent = 
-                    data.metrics.precision.toFixed(3);
-            }
-            
-            // Update model info
-            if (data.model_info) {
-                document.getElementById('model-algo').textContent = data.model_info.algorithm;
-                document.getElementById('model-features').textContent = data.model_info.n_features;
-            }
-            
-            if (data.dataset) {
-                document.getElementById('train-samples').textContent = 
-                    data.dataset.train_samples.toLocaleString();
-                document.getElementById('test-samples').textContent = 
-                    data.dataset.test_samples.toLocaleString();
-            }
-        })
-        .catch(error => {
-            console.log('Training metrics not loaded:', error);
-            // Hide training section if no data
-            document.getElementById('training-metrics').innerHTML = 
-                '<p style="color: #999;">Training metrics not available. Train the model first.</p>';
-        });
+function renderManifest(manifest) {
+    const table = document.getElementById('manifest-table');
+    if (!manifest.models) {
+        table.innerHTML = '<tr><td>No model manifest found</td></tr>';
+        return;
+    }
+    table.innerHTML = `
+        <tr><th>Name</th><th>Type</th><th>Recall</th><th>FPR</th></tr>
+        ${manifest.models.map(model => `
+            <tr>
+                <td>${model.name}${manifest.selected_model === model.name ? ' ⭐' : ''}</td>
+                <td>${model.type}</td>
+                <td>${(model.recall * 100).toFixed(2)}%</td>
+                <td>${(model.false_positive_rate * 100).toFixed(2)}%</td>
+            </tr>
+        `).join('')}
+    `;
 }
 
-// Load training report in new window
-function loadTrainingReport() {
+function renderTraining(training) {
+    const table = document.getElementById('model-table');
+    const metrics = training.model_metrics || {};
+    table.innerHTML = `
+        <tr><th>Accuracy</th><td>${((metrics.test_accuracy || 0) * 100).toFixed(2)}%</td></tr>
+        <tr><th>Recall</th><td>${((metrics.recall || 0) * 100).toFixed(2)}%</td></tr>
+        <tr><th>Precision</th><td>${((metrics.precision || 0) * 100).toFixed(2)}%</td></tr>
+        <tr><th>ROC AUC</th><td>${(metrics.roc_auc || 0).toFixed(3)}</td></tr>
+        <tr><th>Selected Model</th><td>${training.selected_model || 'N/A'}</td></tr>
+        <tr><th>Train Rows</th><td>${training.dataset?.train_rows ?? 'N/A'}</td></tr>
+        <tr><th>Test Rows</th><td>${training.dataset?.test_rows ?? 'N/A'}</td></tr>
+    `;
+}
+
+function updateCharts(history) {
+    if (!history.timestamp || !history.timestamp.length) {
+        return;
+    }
+    const timestamps = history.timestamp.map(ts => new Date(Number(ts)));
+    Plotly.update(gpuChart, { x: [timestamps], y: [history.gpu || []] });
+    Plotly.update(ppsChart, { x: [timestamps], y: [history.pps || []] });
+}
+
+function downloadTrainingReport() {
     window.open('/api/training-report', '_blank');
 }
 
-// Load initial data
-fetch('/api/metrics')
-    .then(response => response.json())
-    .then(data => updateMetrics(data));
+async function refresh() {
+    try {
+        const response = await fetch('/api/dashboard');
+        const data = await response.json();
+        renderSummary(data.summary || {});
+        renderAlerts(data.alerts || []);
+        renderKernelTimes(data.kernel_times || []);
+        renderBlocking(data.blocking || []);
+        renderManifest(data.model_manifest || {});
+        renderTraining(data.training || {});
+        updateCharts(data.metrics_history || {});
+    } catch (error) {
+        console.error('Dashboard refresh failed', error);
+    }
+}
 
-fetch('/api/alerts')
-    .then(response => response.json())
-    .then(data => updateAlerts(data.alerts));
-
-fetch('/api/blackhole')
-    .then(response => response.json())
-    .then(data => updateBlackholeList(data.blackhole_ips));
-
-// Load training metrics on page load
-loadTrainingMetrics();
+refresh();
+setInterval(refresh, 3000);
 
